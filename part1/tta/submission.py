@@ -16,11 +16,13 @@ class Submission(TTAMethod):
         steps: int = 1,
         episodic: bool = False,
         optim: str = "Adam",
-        lr: float = 1e-3,
+        lr: float = 1e-4,
         beta: float = 0.9,
         weight_decay: float = 0.0,
         reset_stats: bool = False,
         no_stats: bool = True,
+        clip_norm: float = 0.0,
+        debug: bool = False,
     ):
         # configure model for tent-style adaptation (sets train mode, freezes
         # grads except BN affine params, and disables running stats if asked)
@@ -41,6 +43,8 @@ class Submission(TTAMethod):
         self.steps = steps
         assert steps > 0, "tent requires >= 1 step(s) to forward and update"
         self.episodic = episodic
+        self.clip_norm = clip_norm
+        self.debug = debug
 
         # snapshot model/optimizer state for episodic resets
         self.model_state, self.optimizer_state = copy_model_and_optimizer(
@@ -52,7 +56,7 @@ class Submission(TTAMethod):
             self.reset()
 
         for _ in range(self.steps):
-            outputs = forward_and_adapt(x, self.model, self.optimizer)
+            outputs = forward_and_adapt(x, self.model, self.optimizer, clip_norm=self.clip_norm, debug=self.debug)
 
         return outputs
 
@@ -70,7 +74,7 @@ def softmax_entropy(x: torch.Tensor) -> torch.Tensor:
 
 
 @torch.enable_grad()  # ensure grads in possible no grad context for testing
-def forward_and_adapt(x, model, optimizer):
+def forward_and_adapt(x, model, optimizer, clip_norm: float = 0.0, debug: bool = False):
     """Forward and adapt model on batch of data.
 
     Measure entropy of the model prediction, take gradients, and update params.
@@ -79,7 +83,18 @@ def forward_and_adapt(x, model, optimizer):
     outputs = model(x)
     # adapt
     loss = softmax_entropy(outputs).mean(0)
+    if debug:
+        try:
+            print(f"[tent] entropy loss={loss.item():.6f}")
+        except Exception:
+            pass
     loss.backward()
+    if clip_norm and clip_norm > 0.0:
+        # collect params from optimizer and clip
+        params = []
+        for g in optimizer.param_groups:
+            params.extend(g.get("params", []))
+        torch.nn.utils.clip_grad_norm_(params, clip_norm)
     optimizer.step()
     optimizer.zero_grad()
     return outputs

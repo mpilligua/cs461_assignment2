@@ -1,0 +1,14 @@
+*/*.cpython-311.pyc
+*/*/*.cpython-311.pyc
+**/*.pyc
+part1/tta/__pycache__/__init__.cpython-311.pyc
+part1/tta/__pycache__/base.cpython-311.pyc
+part1/tta/__pycache__/norm.cpython-311.pyc
+part1/tta/__pycache__/submission.cpython-311.pyc
+part1/tta/__pycache__/unadapted.cpython-311.pyc
+part1/.cache/norm_results.pkl
+part1/.cache/unadapted_results.pkl
+part1/__pycache__/eval.cpython-311.pyc
+part1/__pycache__/utils.cpython-311.pyc
+part1/acache/norm_results.pkl
+part1/acache/unadapted_results.pkl

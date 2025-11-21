@@ -180,7 +180,7 @@ def evaluate_from_config(
     return all_res
 
 
-def evaluate(all_cfgs: list | None, cache_dir=".cache/", force_recompute=False):
+def evaluate(all_cfgs: list | None, cache_dir=".cache/", force_recompute=True):
     os.makedirs(cache_dir, exist_ok=True)
     all_results = {}
     baselines = ["unadapted", "norm"] 

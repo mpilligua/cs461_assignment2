@@ -1,3 +1,6 @@
 tta:
   name: submission
   class_path: tta.submission.Submission
+  args:
+    steps: 1
+    episodic: false

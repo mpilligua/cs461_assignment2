@@ -10,18 +10,42 @@ import torch.jit
 
 # Tent implementation 
 class Submission(TTAMethod):
-    def __init__(self, model, steps=1, episodic=False):
-        super().__init__()
-        self.model = model
-        self.optimizer = torch.optim.Adam(
-            params=collect_params(self.model)[0],
-        )
+    def __init__(
+        self,
+        model,
+        steps: int = 1,
+        episodic: bool = False,
+        optim: str = "Adam",
+        lr: float = 1e-3,
+        beta: float = 0.9,
+        weight_decay: float = 0.0,
+        reset_stats: bool = False,
+        no_stats: bool = True,
+    ):
+        # configure model for tent-style adaptation (sets train mode, freezes
+        # grads except BN affine params, and disables running stats if asked)
+        model = configure_model(model, reset_stats, no_stats)
+        super().__init__(model)
+
+        params, _ = collect_params(self.model)
+        if optim.lower() == "adam":
+            self.optimizer = torch.optim.Adam(
+                params=params, lr=lr, betas=(beta, 0.999), weight_decay=weight_decay
+            )
+        else:
+            # fallback to SGD with momentum
+            self.optimizer = torch.optim.SGD(
+                params=params, lr=lr, momentum=0.9, weight_decay=weight_decay
+            )
+
         self.steps = steps
         assert steps > 0, "tent requires >= 1 step(s) to forward and update"
         self.episodic = episodic
 
-        self.model_state, self.optimizer_state = \
-            copy_model_and_optimizer(self.model, self.optimizer)
+        # snapshot model/optimizer state for episodic resets
+        self.model_state, self.optimizer_state = copy_model_and_optimizer(
+            self.model, self.optimizer
+        )
 
     def forward(self, x):
         if self.episodic:
@@ -93,20 +117,33 @@ def load_model_and_optimizer(model, optimizer, model_state, optimizer_state):
     optimizer.load_state_dict(optimizer_state)
 
 
-def configure_model(model):
-    """Configure model for use with tent."""
+def configure_model(model, reset_stats: bool = False, no_stats: bool = True):
+    """Configure model for use with tent.
+
+    Args:
+        model: model to configure
+        reset_stats: if True, call reset_running_stats() on each BN
+        no_stats: if True, disable tracking running stats and clear them
+    """
     # train mode, because tent optimizes the model to minimize entropy
     model.train()
     # disable grad, to (re-)enable only what tent updates
     model.requires_grad_(False)
-    # configure norm for tent updates: enable grad + force batch statisics
+    # configure norm for tent updates: enable grad + force batch statistics
     for m in model.modules():
         if isinstance(m, nn.BatchNorm2d):
             m.requires_grad_(True)
-            # force use of batch stats in train and eval modes
-            m.track_running_stats = False
-            m.running_mean = None
-            m.running_var = None
+            # configure epsilon/momentum kept as-is; optionally reset stats
+            if reset_stats:
+                try:
+                    m.reset_running_stats()
+                except Exception:
+                    pass
+            if no_stats:
+                # force use of batch stats and disable running buffers
+                m.track_running_stats = False
+                m.running_mean = None
+                m.running_var = None
     return model
 
 

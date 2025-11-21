@@ -1,0 +1,7 @@
+dataset:
+  class_path: dataset.ImageDataset
+  args:
+    dataset_path: /shared/CS461/cs461_assignment2_data/part2/data/
+
+evaluation:
+  device: cuda

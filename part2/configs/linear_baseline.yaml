@@ -1,0 +1,11 @@
+model:
+  class_path: models.linear_baseline.LinearProbe
+  args: 
+    embed_dim: 3072
+    num_classes: 7
+
+  best_weight_path: /shared/CS461/cs461_assignment2_data/part2/ckpts/best_linear_baseline.pt
+
+
+dataset:
+  collate_fn: models.linear_baseline.linear_collate_fn

@@ -1,0 +1,3 @@
+tta:
+  name: submission
+  class_path: tta.submission.Submission

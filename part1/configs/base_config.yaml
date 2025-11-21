@@ -1,0 +1,16 @@
+dataset:
+  class_path: dataset.TestTimeAdaptationDataset
+  args:
+    dataset_path: /shared/CS461/cs461_assignment2_data/part1/data/
+
+model:
+  class_path: models.load_base_model
+  args: 
+    ckpt_path: /shared/CS461/cs461_assignment2_data/part1/ckpts/pretrained_cifar10_resnet50.pt
+
+
+evaluation:
+  device: cuda
+  split: null
+  max_batches: null
+  reset_between_scenarios: true

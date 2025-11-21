@@ -1,0 +1,4 @@
+tta:
+  name: unadapted
+  class_path: tta.unadapted.Unadapted
+  args: {}

@@ -29,7 +29,10 @@ class Submission(TTAMethod):
         super().__init__(model)
 
         # collect BN affine params
-        params, _ = collect_params(self.model)
+        params, names = collect_params(self.model)
+        print("optimizable parameters for Tent adaptation:")
+        for n, p in zip(names, params):
+            print(f"  {n} | shape={tuple(p.shape)} | requires_grad={p.requires_grad} | device={p.device}")
 
         # build optimizer using provided hyperparameters
         if optim.lower() == "adam":
@@ -47,6 +50,17 @@ class Submission(TTAMethod):
         self.clip_norm = clip_norm
         self.debug = debug
 
+        # debug: print optimizer/param summary
+        if self.debug:
+            try:
+                print(f"[Submission] optimizer: {self.optimizer.__class__.__name__}")
+                print(f"[Submission] num params in optimizer: {sum(len(g.get('params', [])) for g in self.optimizer.param_groups)}")
+                print("[Submission] BN params:")
+                for n, p in zip(names, params):
+                    print(f"  {n} | shape={tuple(p.shape)} | requires_grad={p.requires_grad} | device={p.device}")
+            except Exception:
+                pass
+
         # snapshot model/optimizer state for episodic resets
         self.model_state, self.optimizer_state = copy_model_and_optimizer(
             self.model, self.optimizer
@@ -56,10 +70,24 @@ class Submission(TTAMethod):
         if self.episodic:
             self.reset()
 
+        # optional debug: snapshot BN params before/after adaptation to verify updates
+        if self.debug:
+            params_before = [p.detach().cpu().clone() for p in collect_params(self.model)[0]]
+
         for _ in range(self.steps):
             outputs = forward_and_adapt(
                 x, self.model, self.optimizer, clip_norm=self.clip_norm, debug=self.debug
             )
+
+        if self.debug:
+            params_after = [p.detach().cpu().clone() for p in collect_params(self.model)[0]]
+            try:
+                total_change = 0.0
+                for a, b in zip(params_before, params_after):
+                    total_change += (a - b).abs().sum().item()
+                print(f"[Submission] total BN param change this forward: {total_change:.6e}")
+            except Exception:
+                pass
 
         return outputs
 

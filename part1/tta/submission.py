@@ -10,53 +10,36 @@ import torch.jit
 
 # Tent implementation 
 class Submission(TTAMethod):
-    def __init__(
-        self,
-        model,
-        steps: int = 1,
-        episodic: bool = False,
-        optim: str = "Adam",
-        lr: float = 1e-4,
-        beta: float = 0.9,
-        weight_decay: float = 0.0,
-        reset_stats: bool = False,
-        no_stats: bool = True,
-        clip_norm: float = 0.0,
-        debug: bool = False,
-    ):
-        # configure model for tent-style adaptation (sets train mode, freezes
-        # grads except BN affine params, and disables running stats if asked)
-        model = configure_model(model, reset_stats, no_stats)
+    def __init__(self, 
+                 model, 
+                 steps=1, 
+                 episodic=False,
+                 optim="Adam", 
+                lr=1e-4,
+                beta=0.9,
+                weight_decay=0.0,
+                reset_stats=False, 
+                no_stats=True,
+                clip_norm=1.0,
+                debug=True):
         super().__init__(model)
-
-        params, _ = collect_params(self.model)
-        if optim.lower() == "adam":
-            self.optimizer = torch.optim.Adam(
-                params=params, lr=lr, betas=(beta, 0.999), weight_decay=weight_decay
-            )
-        else:
-            # fallback to SGD with momentum
-            self.optimizer = torch.optim.SGD(
-                params=params, lr=lr, momentum=0.9, weight_decay=weight_decay
-            )
-
+        self.model = model
+        self.optimizer = torch.optim.Adam(
+            params=collect_params(self.model)[0],
+        )
         self.steps = steps
         assert steps > 0, "tent requires >= 1 step(s) to forward and update"
         self.episodic = episodic
-        self.clip_norm = clip_norm
-        self.debug = debug
 
-        # snapshot model/optimizer state for episodic resets
-        self.model_state, self.optimizer_state = copy_model_and_optimizer(
-            self.model, self.optimizer
-        )
+        self.model_state, self.optimizer_state = \
+            copy_model_and_optimizer(self.model, self.optimizer)
 
     def forward(self, x):
         if self.episodic:
             self.reset()
 
         for _ in range(self.steps):
-            outputs = forward_and_adapt(x, self.model, self.optimizer, clip_norm=self.clip_norm, debug=self.debug)
+            outputs = forward_and_adapt(x, self.model, self.optimizer)
 
         return outputs
 
@@ -74,7 +57,7 @@ def softmax_entropy(x: torch.Tensor) -> torch.Tensor:
 
 
 @torch.enable_grad()  # ensure grads in possible no grad context for testing
-def forward_and_adapt(x, model, optimizer, clip_norm: float = 0.0, debug: bool = False):
+def forward_and_adapt(x, model, optimizer):
     """Forward and adapt model on batch of data.
 
     Measure entropy of the model prediction, take gradients, and update params.
@@ -83,18 +66,7 @@ def forward_and_adapt(x, model, optimizer, clip_norm: float = 0.0, debug: bool =
     outputs = model(x)
     # adapt
     loss = softmax_entropy(outputs).mean(0)
-    if debug:
-        try:
-            print(f"[tent] entropy loss={loss.item():.6f}")
-        except Exception:
-            pass
     loss.backward()
-    if clip_norm and clip_norm > 0.0:
-        # collect params from optimizer and clip
-        params = []
-        for g in optimizer.param_groups:
-            params.extend(g.get("params", []))
-        torch.nn.utils.clip_grad_norm_(params, clip_norm)
     optimizer.step()
     optimizer.zero_grad()
     return outputs
@@ -132,33 +104,20 @@ def load_model_and_optimizer(model, optimizer, model_state, optimizer_state):
     optimizer.load_state_dict(optimizer_state)
 
 
-def configure_model(model, reset_stats: bool = False, no_stats: bool = True):
-    """Configure model for use with tent.
-
-    Args:
-        model: model to configure
-        reset_stats: if True, call reset_running_stats() on each BN
-        no_stats: if True, disable tracking running stats and clear them
-    """
+def configure_model(model):
+    """Configure model for use with tent."""
     # train mode, because tent optimizes the model to minimize entropy
     model.train()
     # disable grad, to (re-)enable only what tent updates
     model.requires_grad_(False)
-    # configure norm for tent updates: enable grad + force batch statistics
+    # configure norm for tent updates: enable grad + force batch statisics
     for m in model.modules():
         if isinstance(m, nn.BatchNorm2d):
             m.requires_grad_(True)
-            # configure epsilon/momentum kept as-is; optionally reset stats
-            if reset_stats:
-                try:
-                    m.reset_running_stats()
-                except Exception:
-                    pass
-            if no_stats:
-                # force use of batch stats and disable running buffers
-                m.track_running_stats = False
-                m.running_mean = None
-                m.running_var = None
+            # force use of batch stats in train and eval modes
+            m.track_running_stats = False
+            m.running_mean = None
+            m.running_var = None
     return model
 
 

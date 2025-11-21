@@ -216,6 +216,6 @@ if __name__ == "__main__":
     all_cfgs = sys.argv[1:] if len(sys.argv) > 1 else []
     res = evaluate(
         all_cfgs, cache_dir=".cache/",
-        force_recompute=False
+        force_recompute=True
     )
         

@@ -16,3 +16,5 @@ part1/tta/__pycache__/submission.cpython-311.pyc
 part1/tta/__pycache__/submission.cpython-313.pyc
 part1/tta/__pycache__/unadapted.cpython-311.pyc
 part1/tta/__pycache__/unadapted.cpython-313.pyc
+part1/.cache/*
+

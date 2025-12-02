@@ -1,0 +1,30 @@
+tta:
+  name: tent_base
+  class_path: tta.tent_base.TentBase
+  args:
+    # Adaptation steps per batch
+    steps: 1
+    
+    # Episodic adaptation (reset model after each batch)
+    # Set to true for independent batch adaptation
+    # Set to false for continual adaptation across batches
+    episodic: false
+    
+    # Optimizer configuration
+    optim: Adam
+    lr: 0.00025  # Original Tent uses small learning rate
+    beta: 0.9    # Adam momentum parameter
+    weight_decay: 0.0
+    
+    # Batch normalization statistics
+    reset_stats: false  # Whether to reset BN running statistics at start
+    no_stats: true      # Use batch statistics instead of running statistics
+    
+    # Gradient clipping (0 = disabled)
+    clip_norm: 0.0
+    
+    # Logging
+    debug: true
+    log_wandb: true
+
+

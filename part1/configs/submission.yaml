@@ -1,14 +1,32 @@
+# Submission: Tent with Consistency-Finetuned Model
+# 
+# This method uses a ResNet50 finetuned for corruption-invariant early layers,
+# combined with test-time entropy minimization (Tent).
+
 tta:
-  name: submission_debug
+  name: submission
   class_path: tta.submission.Submission
   args:
-    steps: 1
-    episodic: true
-    optim: Adam
-    lr: 1e-3
+    # Path to finetuned model (relative to part1/)
+    finetuned_path: "finetuned_consistency_v3.pt"
+
+    # Which layers' BN to adapt during TTA
+    adapt_layers: "layer1"
+
+    # Optimization
+    lr: 0.00025
+    optim: "Adam"
     beta: 0.9
     weight_decay: 0.0
-    reset_stats: false
-    no_stats: true
-    clip_norm: 1.0
-    debug: true
+    clip_norm: 0.0
+
+    # Adaptation steps per batch
+    steps: 1
+
+    # Whether to reset after each batch
+    episodic: false
+
+    # Debugging
+    debug: false
+    log_wandb: false
+

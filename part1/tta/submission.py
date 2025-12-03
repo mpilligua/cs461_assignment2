@@ -18,12 +18,6 @@ import torch.jit
 
 from tta.base import TTAMethod
 
-try:
-    import wandb
-    WANDB_AVAILABLE = True
-except ImportError:
-    WANDB_AVAILABLE = False
-
 
 @torch.jit.script
 def softmax_entropy(x: torch.Tensor) -> torch.Tensor:
@@ -144,8 +138,7 @@ class Submission(TTAMethod):
                  clip_norm: float = 0.0,
                  disc_weight: float = 0.1,
                  use_discriminator: bool = True,
-                 debug: bool = False,
-                 log_wandb: bool = False):
+                 debug: bool = False):
         """
         Args:
             model: Neural network model (will be replaced with finetuned weights if available)
@@ -162,7 +155,6 @@ class Submission(TTAMethod):
             disc_weight: Weight for discriminator loss (0 to disable)
             use_discriminator: Whether to use discriminator guidance
             debug: Whether to print debug info
-            log_wandb: Whether to log to wandb
         """
         # Try to load finetuned weights (state_dict format)
         try:
@@ -187,7 +179,6 @@ class Submission(TTAMethod):
         self.episodic = episodic
         self.clip_norm = clip_norm
         self.debug = debug
-        self.log_wandb = log_wandb and WANDB_AVAILABLE
         self.batch_idx = 0
         self.adapt_layers = adapt_layers
         self.disc_weight = disc_weight
@@ -312,17 +303,6 @@ class Submission(TTAMethod):
         # Final forward
         with torch.no_grad():
             outputs = self.model(x)
-        
-        if self.log_wandb and WANDB_AVAILABLE:
-            try:
-                wandb.log({
-                    "submission/entropy": entropy_loss.item(),
-                    "submission/disc_loss": disc_loss.item() if self.discriminator else 0,
-                    "submission/total_loss": loss.item(),
-                    "submission/batch_idx": self.batch_idx,
-                })
-            except:
-                pass
         
         self.batch_idx += 1
         return outputs
